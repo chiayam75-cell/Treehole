@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心聲樹洞 Echo Haven</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+    </style>
+</head>
+<body class="bg-amber-50/40 min-h-screen text-slate-700 pb-12">
+
+    <!-- 頂部 Header -->
+    <header class="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-amber-100 shadow-sm">
+        <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🌲</span>
+                <div>
+                    <h1 class="font-bold text-amber-900 text-lg leading-tight">心聲樹洞</h1>
+                    <p class="text-xs text-amber-600/80">Echo Haven · 匿名傾訴空間</p>
+                </div>
+            </div>
+            <div id="statusBadge" class="text-xs px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>🟢 雲端已連線</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-2xl mx-auto px-4 pt-6 space-y-6">
+
+        <!-- 歡迎卡片 -->
+        <div class="bg-gradient-to-br from-amber-50 to-orange-50/60 p-5 rounded-2xl border border-amber-200/60 shadow-sm">
+            <h2 class="text-base font-bold text-amber-900 mb-1.5 flex items-center gap-2">
+                ✨ 歡迎來到屬於你的安全角落
+            </h2>
+            <p class="text-sm text-slate-600 leading-relaxed">
+                工作累了、生活煩了？在這裡寫下你的心情或悄悄話。完全匿名，讓我們一起互相給予溫暖與 Hug！
+            </p>
+        </div>
+
+        <!-- 發表心聲區塊 -->
+        <div class="bg-white p-5 rounded-2xl border border-amber-100 shadow-sm space-y-4">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-pen-nib text-amber-600"></i> 傾訴樹洞：分享你此刻的心情
+            </h3>
+
+            <!-- 標籤選擇 -->
+            <div class="flex flex-wrap gap-2 text-xs">
+                <button onclick="selectTag(this)" class="tag-btn px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 active-tag bg-amber-500 text-white border-amber-500">🌧️ 難過</button>
+                <button onclick="selectTag(this)" class="tag-btn px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600">😤 憤怒</button>
+                <button onclick="selectTag(this)" class="tag-btn px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600">☁️ 迷惘</button>
+                <button onclick="selectTag(this)" class="tag-btn px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600">🌿 釋懷</button>
+                <button onclick="selectTag(this)" class="tag-btn px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600">🌸 感謝</button>
+                <button onclick="selectTag(this)" class="tag-btn px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600">☕ 隨筆</button>
+            </div>
+
+            <!-- 輸入框 -->
+            <textarea id="messageInput" rows="3" class="w-full p-3.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400/50 resize-none" placeholder="說說看吧... 不管是工作壓力、生活困頓，還是藏在心裡的悄悄話..."></textarea>
+
+            <div class="flex justify-end">
+                <button onclick="postMessage()" class="px-5 py-2 bg-amber-600 hover:bg-amber-700 active:scale-95 transition text-white text-sm font-medium rounded-xl shadow-sm shadow-amber-200 flex items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> 發送心聲
+                </button>
+            </div>
+        </div>
+
+        <!-- 樹洞留言列表 -->
+        <div class="space-y-3">
+            <h3 class="text-sm font-bold text-slate-700 px-1">🍃 即時心聲交流</h3>
+            <div id="messagesList" class="space-y-3">
+                <!-- 預設載入示範 -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">☕ 隨筆</span>
+                        <span class="text-slate-400">剛剛</span>
+                    </div>
+                    <p class="text-sm text-slate-700 leading-relaxed">歡迎來到情緒樹洞！這裡已經成功架設完成囉 🥳</p>
+                    <div class="flex justify-end pt-1">
+                        <button onclick="giveHug(this)" class="text-xs text-rose-500 bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-full border border-rose-100 flex items-center gap-1 transition">
+                            ❤️ 給予 Hug (<span class="hug-count">3</span>)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        let currentTag = '🌧️ 難過';
+
+        function selectTag(btn) {
+            document.querySelectorAll('.tag-btn').forEach(b => {
+                b.classList.remove('bg-amber-500', 'text-white', 'border-amber-500');
+                b.classList.add('bg-slate-50', 'text-slate-600', 'border-slate-200');
+            });
+            btn.classList.remove('bg-slate-50', 'text-slate-600', 'border-slate-200');
+            btn.classList.add('bg-amber-500', 'text-white', 'border-amber-500');
+            currentTag = btn.innerText;
+        }
+
+        function postMessage() {
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) {
+                alert('請輸入一些文字再發送喔！');
+                return;
+            }
+
+            const list = document.getElementById('messagesList');
+            const newCard = document.createElement('div');
+            newCard.className = 'bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2 animate-fade-in';
+            newCard.innerHTML = `
+                <div class="flex justify-between items-center text-xs">
+                    <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">${currentTag}</span>
+                    <span class="text-slate-400">剛剛</span>
+                </div>
+                <p class="text-sm text-slate-700 leading-relaxed">${escapeHtml(text)}</p>
+                <div class="flex justify-end pt-1">
+                    <button onclick="giveHug(this)" class="text-xs text-rose-500 bg-rose-50 hover:bg-rose-100 px-3 py-1 rounded-full border border-rose-100 flex items-center gap-1 transition">
+                        ❤️ 給予 Hug (<span class="hug-count">0</span>)
+                    </button>
+                </div>
+            `;
+            list.prepend(newCard);
+            input.value = '';
+        }
+
+        function giveHug(btn) {
+            const countSpan = btn.querySelector('.hug-count');
+            countSpan.innerText = parseInt(countSpan.innerText) + 1;
+            btn.classList.add('scale-110');
+            setTimeout(() => btn.classList.remove('scale-110'), 150);
+        }
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+</body>
+</html>
