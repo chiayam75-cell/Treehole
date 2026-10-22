@@ -1,0 +1,407 @@
+```html
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>心聲樹洞 Echo Haven - 跨用戶即時雲端情緒樹洞</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Noto Sans TC & Lexend -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        warmBg: '#fbf8f3',
+                        warmCard: '#ffffff',
+                        warmBorder: '#f0e6d8',
+                        softPink: '#fbe4e2',
+                        softBlue: '#e2edf8',
+                        softYellow: '#fef3d6',
+                        softGreen: '#e3f2e9',
+                        softPurple: '#efe4f8',
+                        warmAccent: '#d97757',
+                        warmAccentHover: '#c56445',
+                        textDark: '#4a3e3d',
+                        textMuted: '#8c7a78'
+                    },
+                    fontFamily: {
+                        sans: ['Noto Sans TC', 'Lexend', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        cozy: '0 4px 20px -2px rgba(217, 119, 87, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+                        cozyHover: '0 10px 25px -3px rgba(217, 119, 87, 0.15), 0 4px 10px -2px rgba(0, 0, 0, 0.04)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #fbf8f3;
+            color: #4a3e3d;
+            font-family: 'Noto Sans TC', sans-serif;
+            background-image: radial-gradient(#e8dec9 0.75px, transparent 0.75px);
+            background-size: 24px 24px;
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .heartbeat:hover {
+            animation: heartbeat 1.2s infinite;
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1ebe1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d8c8b8;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #bfae9e;
+        }
+    </style>
+
+    <!-- Firebase SDK (v11.6.1) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            addDoc, 
+            updateDoc, 
+            onSnapshot, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 全域變數初始化
+        window.db = null;
+        window.auth = null;
+        window.currentUser = null;
+        window.isCloudConnected = false;
+
+        // 全域函數定義，以便傳統 JS 調用
+        window.addDocFS = addDoc;
+        window.updateDocFS = updateDoc;
+        window.docFS = doc;
+        window.collectionFS = collection;
+
+        // Firebase 初始化邏輯
+        async function initFirebase() {
+            try {
+                // 優先檢查是否有來自環境的 Firebase 設定，否則回退至示範模式或使用者自訂
+                const defaultAppId = typeof __app_id !== 'undefined' ? __app_id : 'echo-haven-demo';
+                window.appId = defaultAppId;
+
+                let firebaseConfig = null;
+                const userConfigStr = localStorage.getItem('custom_firebase_config');
+
+                if (userConfigStr) {
+                    try { firebaseConfig = JSON.parse(userConfigStr); } catch(e){}
+                }
+
+                if (!firebaseConfig && typeof __firebase_config !== 'undefined') {
+                    try { firebaseConfig = JSON.parse(__firebase_config); } catch(e){}
+                }
+
+                // 備用示範設定 (當無傳入設定時維持前端畫面可運作)
+                if (!firebaseConfig) {
+                    console.log("未檢測到 Firebase 憑證，將開啟即時資料庫模式");
+                    updateStatusIndicator(false, "尚未連接自訂 Firebase (使用本機即時模式)");
+                    window.initLocalFallback();
+                    return;
+                }
+
+                const app = initializeApp(firebaseConfig);
+                window.db = getFirestore(app);
+                window.auth = getAuth(app);
+
+                // 驗證流程
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(window.auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(window.auth);
+                }
+
+                onAuthStateChanged(window.auth, (user) => {
+                    if (user) {
+                        window.currentUser = user;
+                        window.isCloudConnected = true;
+                        updateStatusIndicator(true, "雲端資料庫已連線 (即時同步中)");
+                        listenToPostsRealtime();
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase 初始化失敗:", error);
+                updateStatusIndicator(false, "雲端連線失敗，自動切換至本機模式");
+                window.initLocalFallback();
+            }
+        }
+
+        function updateStatusIndicator(isConnected, text) {
+            const badge = document.getElementById('cloud-status-badge');
+            const statusText = document.getElementById('cloud-status-text');
+            if (badge && statusText) {
+                statusText.textContent = text;
+                if (isConnected) {
+                    badge.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                } else {
+                    badge.className = "w-2.5 h-2.5 rounded-full bg-amber-500";
+                }
+            }
+        }
+
+        // 監聽 Firebase Firestore 文章即時變化
+        function listenToPostsRealtime() {
+            if (!window.db || !window.currentUser) return;
+
+            // 遵守 Rule 1: /artifacts/{appId}/public/data/posts
+            const postsCollection = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'posts');
+
+            onSnapshot(postsCollection, (snapshot) => {
+                const fetchedPosts = [];
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    fetchedPosts.push({
+                        id: docSnap.id,
+                        ...data,
+                        createdAtTime: data.createdAt ? (data.createdAt.seconds ? data.createdAt.seconds * 1000 : Date.now()) : Date.now()
+                    });
+                });
+
+                // JavaScript 記憶體排序 (遵守 Rule 2)
+                fetchedPosts.sort((a, b) => b.createdAtTime - a.createdAtTime);
+
+                window.posts = fetchedPosts;
+                window.renderPosts();
+            }, (error) => {
+                console.error("Firestore 即時監聽失敗:", error);
+            });
+        }
+
+        window.initFirebase = initFirebase;
+        window.addEventListener('DOMContentLoaded', initFirebase);
+    </script>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-warmAccent selection:text-white">
+
+    <!-- Header / 頂部導航區域 -->
+    <header class="sticky top-0 z-30 backdrop-blur-md bg-warmBg/85 border-b border-warmBorder/60 transition-all duration-200">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3 text-center sm:text-left">
+                <div class="w-10 h-10 rounded-full bg-warmAccent/15 flex items-center justify-center text-warmAccent text-xl shadow-inner">
+                    <i class="fa-solid fa-tree"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-textDark tracking-wide flex items-center gap-2 justify-center sm:justify-start">
+                        心聲樹洞 <span class="text-xs font-normal px-2 py-0.5 bg-warmAccent/10 text-warmAccent rounded-full border border-warmAccent/20">Echo Haven</span>
+                    </h1>
+                    <p class="text-xs text-textMuted">傾訴、聽見，雲端即時相伴的匿名心聲空間</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- 雲端連線狀態標籤 -->
+                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-warmCard border border-warmBorder text-xs text-textMuted shadow-sm">
+                    <span id="cloud-status-badge" class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                    <span id="cloud-status-text">連線中...</span>
+                </div>
+
+                <!-- 自訂 Firebase 設定按鈕 -->
+                <button onclick="openConfigModal()" title="設定自己的 Firebase 憑證" class="p-2 rounded-full hover:bg-warmBorder/40 text-textMuted transition">
+                    <i class="fa-solid fa-gear text-sm"></i>
+                </button>
+
+                <!-- 發布心聲按鈕 -->
+                <button onclick="scrollToPostForm()" class="px-4 py-2 bg-warmAccent hover:bg-warmAccentHover text-white font-medium rounded-full shadow-md hover:shadow-lg transition-all text-xs flex items-center gap-1.5 heartbeat">
+                    <i class="fa-solid fa-pen-nib"></i>
+                    <span>寫心聲</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container / 主要內容區 -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex-grow w-full">
+
+        <!-- Banner / 溫馨提示卡片 -->
+        <div class="mb-8 p-6 rounded-2xl bg-gradient-to-r from-softPink/60 via-softYellow/50 to-softBlue/60 border border-warmBorder/80 shadow-cozy relative overflow-hidden">
+            <div class="relative z-10 max-w-2xl">
+                <h2 class="text-lg font-bold text-textDark mb-1 flex items-center gap-2">
+                    <span>✨ 跨越距離的情緒陪伴</span>
+                </h2>
+                <p class="text-sm text-textDark/80 leading-relaxed mb-3">
+                    賺錢顧及他人情緒的同時，記得這裡有一個屬於你的安全角落。你在此處發布的每一個字、每一個 Hug，都會即時傳遞給全世界正在打開這個網站的陌生人。
+                </p>
+                <div class="flex flex-wrap gap-4 text-xs font-medium text-textMuted">
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-bolt text-warmAccent"></i> 雲端 Real-Time 即時同步</span>
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-user-secret text-warmAccent"></i> 100% 匿名保密</span>
+                    <span class="flex items-center gap-1"><i class="fa-solid fa-heart text-rose-500"></i> 無聲的傾聽與溫暖</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 寫下心情表單區段 -->
+        <section id="post-form-section" class="mb-10 bg-warmCard p-6 sm:p-8 rounded-2xl border border-warmBorder shadow-cozy">
+            <h2 class="text-base font-bold text-textDark mb-4 flex items-center gap-2">
+                <i class="fa-regular fa-paper-plane text-warmAccent"></i>
+                <span>傾訴樹洞：分享你此刻的心情</span>
+            </h2>
+
+            <form id="emotion-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                <!-- 選擇情緒標籤 -->
+                <div>
+                    <label class="block text-xs font-medium text-textMuted mb-2">選擇適合你現在情緒的標籤：</label>
+                    <div class="flex flex-wrap gap-2" id="tag-selector">
+                        <button type="button" onclick="selectTag('🌧️ 難過')" class="tag-option px-3.5 py-1.5 rounded-full border border-warmBorder text-xs text-textDark bg-softBlue/30 hover:bg-softBlue transition" data-tag="🌧️ 難過">
+                            🌧️ 難過
+                        </button>
+                        <button type="button" onclick="selectTag('😤 憤怒')" class="tag-option px-3.5 py-1.5 rounded-full border border-warmBorder text-xs text-textDark bg-softPink/30 hover:bg-softPink transition" data-tag="😤 憤怒">
+                            😤 憤怒
+                        </button>
+                        <button type="button" onclick="selectTag('☁️ 迷惘')" class="tag-option px-3.5 py-1.5 rounded-full border border-warmBorder text-xs text-textDark bg-softPurple/30 hover:bg-softPurple transition" data-tag="☁️ 迷惘">
+                            ☁️ 迷惘
+                        </button>
+                        <button type="button" onclick="selectTag('🌿 釋懷')" class="tag-option px-3.5 py-1.5 rounded-full border border-warmBorder text-xs text-textDark bg-softGreen/30 hover:bg-softGreen transition" data-tag="🌿 釋懷">
+                            🌿 釋懷
+                        </button>
+                        <button type="button" onclick="selectTag('🌸 感謝')" class="tag-option px-3.5 py-1.5 rounded-full border border-warmBorder text-xs text-textDark bg-softYellow/40 hover:bg-softYellow transition" data-tag="🌸 感謝">
+                            🌸 感謝
+                        </button>
+                        <button type="button" onclick="selectTag('☕ 隨筆')" class="tag-option px-3.5 py-1.5 rounded-full border border-warmBorder text-xs text-textDark bg-stone-100 hover:bg-stone-200 transition" data-tag="☕ 隨筆">
+                            ☕ 隨筆
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 文字輸入區域 -->
+                <div>
+                    <textarea 
+                        id="post-content" 
+                        rows="4" 
+                        maxlength="600"
+                        required
+                        placeholder="說說看吧... 不管是工作壓力、生活困頓，還是藏在心裡的悄悄話..." 
+                        class="w-full p-4 rounded-xl border border-warmBorder bg-warmBg/50 text-textDark placeholder:text-textMuted/60 focus:outline-none focus:ring-2 focus:ring-warmAccent/40 focus:bg-white text-sm leading-relaxed resize-y transition-all"
+                    ></textarea>
+                    <div class="flex justify-between items-center text-xs text-textMuted mt-1 px-1">
+                        <span>💡 完全匿名發布，雲端即時同步</span>
+                        <span id="char-counter">0 / 600</span>
+                    </div>
+                </div>
+
+                <!-- 暱稱（選填）與發布按鈕 -->
+                <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-2">
+                    <div class="flex items-center gap-2 bg-warmBg px-3 py-1.5 rounded-lg border border-warmBorder sm:w-64">
+                        <i class="fa-regular fa-user text-textMuted text-xs"></i>
+                        <input 
+                            type="text" 
+                            id="post-author" 
+                            placeholder="暱稱 (預設：無名旅人)" 
+                            maxlength="15"
+                            class="bg-transparent text-xs text-textDark w-full focus:outline-none placeholder:text-textMuted/60"
+                        />
+                    </div>
+
+                    <button 
+                        type="submit" 
+                        id="submit-btn"
+                        class="px-6 py-2.5 bg-warmAccent hover:bg-warmAccentHover text-white text-sm font-medium rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                    >
+                        <i class="fa-solid fa-paper-plane text-xs"></i>
+                        <span>悄悄傳送到雲端樹洞</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 篩選與分類導覽區段 -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div class="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 scrollbar-none" id="filter-container">
+                <span class="text-xs font-medium text-textMuted whitespace-nowrap mr-1"><i class="fa-solid fa-filter"></i> 篩選心情：</span>
+                <button onclick="filterPosts('ALL')" class="filter-btn active px-3.5 py-1.5 rounded-full text-xs font-medium border border-warmAccent bg-warmAccent text-white transition whitespace-nowrap shadow-sm" data-filter="ALL">
+                    全部顯示
+                </button>
+                <button onclick="filterPosts('🌧️ 難過')" class="filter-btn px-3.5 py-1.5 rounded-full text-xs font-medium border border-warmBorder bg-white text-textDark hover:border-warmAccent/40 transition whitespace-nowrap" data-filter="🌧️ 難過">
+                    🌧️ 難過
+                </button>
+                <button onclick="filterPosts('😤 憤怒')" class="filter-btn px-3.5 py-1.5 rounded-full text-xs font-medium border border-warmBorder bg-white text-textDark hover:border-warmAccent/40 transition whitespace-nowrap" data-filter="😤 憤怒">
+                    😤 憤怒
+                </button>
+                <button onclick="filterPosts('☁️ 迷惘')" class="filter-btn px-3.5 py-1.5 rounded-full text-xs font-medium border border-warmBorder bg-white text-textDark hover:border-warmAccent/40 transition whitespace-nowrap" data-filter="☁️ 迷惘">
+                    ☁️ 迷惘
+                </button>
+                <button onclick="filterPosts('🌿 釋懷')" class="filter-btn px-3.5 py-1.5 rounded-full text-xs font-medium border border-warmBorder bg-white text-textDark hover:border-warmAccent/40 transition whitespace-nowrap" data-filter="🌿 釋懷">
+                    🌿 釋懷
+                </button>
+                <button onclick="filterPosts('🌸 感謝')" class="filter-btn px-3.5 py-1.5 rounded-full text-xs font-medium border border-warmBorder bg-white text-textDark hover:border-warmAccent/40 transition whitespace-nowrap" data-filter="🌸 感謝">
+                    🌸 感謝
+                </button>
+                <button onclick="filterPosts('☕ 隨筆')" class="filter-btn px-3.5 py-1.5 rounded-full text-xs font-medium border border-warmBorder bg-white text-textDark hover:border-warmAccent/40 transition whitespace-nowrap" data-filter="☕ 隨筆">
+                    ☕ 隨筆
+                </button>
+            </div>
+
+            <div class="text-right flex items-center gap-2 justify-end">
+                <span id="post-count-label" class="text-xs text-textMuted">正在從雲端同步心聲...</span>
+            </div>
+        </div>
+
+        <!-- 樹洞貼文牆 / Cards Wall Grid -->
+        <div id="posts-wall" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- 動態由 JavaScript / Firebase 渲染 -->
+        </div>
+
+        <!-- 空狀態顯示 -->
+        <div id="empty-state" class="hidden text-center py-16 bg-warmCard/50 rounded-2xl border border-dashed border-warmBorder my-4">
+            <div class="w-16 h-16 mx-auto mb-3 text-warmBorder flex items-center justify-center text-3xl">
+                <i class="fa-regular fa-comment-dots"></i>
+            </div>
+            <h3 class="text-base font-medium text-textDark mb-1">這個情緒分類目前還沒有留痕</h3>
+            <p class="text-xs text-textMuted mb-4">成為第一個在這個主題下留話的人吧</p>
+            <button onclick="scrollToPostForm()" class="px-4 py-2 bg-warmAccent/10 text-warmAccent hover:bg-warmAccent hover:text-white transition rounded-full text-xs font-medium">
+                撰寫心聲
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal: 自訂 Firebase Config 設定 -->
+    <div id="config-modal" class="fixed inset-0 
